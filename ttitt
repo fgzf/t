@@ -138,7 +138,7 @@ local function StartCameraAimLoop()
 
         local arcHeight = getArc(dist)
         if not IsDunkAnimPlaying() then
-            arcHeight = arcHeight - 9.5
+            arcHeight = arcHeight - 6.5
         end
 
         local targetPos = goal.Position + Vector3.new(0, arcHeight, 0)
