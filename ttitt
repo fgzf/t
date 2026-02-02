@@ -11,6 +11,10 @@ local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = Player:GetMouse()
 
+-- Flags
+local blockNextJump = false      -- prevents T from triggering lock
+local tJumped = false            -- remembers if the current jump was caused by T
+
 -- Detect Dunk Animation
 local function IsDunkAnimPlaying()
     if not Player.Character or not Player.Character:FindFirstChild("Humanoid") then
@@ -123,7 +127,7 @@ local savedCFrame = nil
 local guidingEnabled = true
 local connection = nil
 
-local function StartCameraAimLoop()
+local function StartCameraAimLoop(extraArc)
     if isGuiding or not guidingEnabled then return end
     isGuiding = true
     savedCFrame = Camera.CFrame
@@ -137,12 +141,16 @@ local function StartCameraAimLoop()
         if not goal then return end
 
         local arcHeight = getArc(dist)
+
+        if extraArc then
+            arcHeight = arcHeight + extraArc
+        end
+
         if not IsDunkAnimPlaying() then
-            arcHeight = arcHeight - 6.5
+            arcHeight = arcHeight - 6
         end
 
         local targetPos = goal.Position + Vector3.new(0, arcHeight, 0)
-
         Camera.CFrame = CFrame.new(camPos, targetPos)
 
         local screenPoint, onScreen = Camera:WorldToScreenPoint(targetPos)
@@ -176,18 +184,33 @@ local function setupCharacter(char)
     local humanoid = char:WaitForChild("Humanoid")
     local rootPart = char:WaitForChild("HumanoidRootPart")
 
-    -- DUNK LOGIC STILL WORKS
+    -- JUMP DETECTION (T‑jump block)
     humanoid:GetPropertyChangedSignal("Jump"):Connect(function()
-        if humanoid.Jump and guidingEnabled then
-            task.delay(0.1, function()
-                if IsDunkAnimPlaying() then
-                    StartCameraAimLoop()
-                    task.delay(0.5, StopCameraAimLoop)
-                end
-            end)
+        if humanoid.Jump then
+
+            -- If jump was caused by T → block lock + mark tJumped
+            if blockNextJump then
+                tJumped = true
+                blockNextJump = false
+                return
+            end
+
+            -- Normal jump → clear tJumped
+            tJumped = false
+
+            -- Dunk logic still works normally
+            if guidingEnabled then
+                task.delay(0.1, function()
+                    if IsDunkAnimPlaying() then
+                        StartCameraAimLoop()
+                        task.delay(0.5, StopCameraAimLoop)
+                    end
+                end)
+            end
         end
     end)
 
+    -- Stop guiding when ball removed
     char.ChildRemoved:Connect(function(child)
         if child.Name == "Basketball" and isGuiding then
             StopCameraAimLoop()
@@ -200,16 +223,17 @@ if Player.Character then
 end
 Player.CharacterAdded:Connect(setupCharacter)
 
--- X = Auto Jump + Set Power + Fast Lock + Shoot
+-- INPUT HANDLER
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
-    -- ❌ If T is pressed, do NOTHING
+    -- ❌ T should NEVER trigger lock
     if input.KeyCode == Enum.KeyCode.T then
+        blockNextJump = true
         return
     end
 
-    -- ✅ Only X triggers the lock system
+    -- ✔️ X = Auto Jump + Peak Lock + Shoot
     if input.KeyCode == Enum.KeyCode.X then
         local char = Player.Character
         if not char then return end
@@ -220,7 +244,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
         if not humanoid or not rootPart or not basketball then return end
 
-        -- SET POWER TO 100 WHEN PRESSING X
+        -- SET POWER TO 100
         local power = basketball:FindFirstChild("PowerValue")
         if power then
             power.Value = 100
@@ -241,8 +265,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if hasRisen and velY <= 0 then
                 peakConnection:Disconnect()
 
-                StartCameraAimLoop()
-                task.wait(0.005)
+                -- If jump was caused by T → arc +10
+                local extraArc = tJumped and 10 or 0
+
+                StartCameraAimLoop(extraArc)
+				wait()
                 mouse1click()
 
                 task.spawn(function()
@@ -253,4 +280,3 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end)
     end
 end)
-
