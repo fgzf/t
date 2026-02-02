@@ -203,8 +203,14 @@ Player.CharacterAdded:Connect(setupCharacter)
 -- X = Auto Jump + Set Power + Fast Lock + Shoot
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+
+    -- ❌ If T is pressed, do NOTHING
+    if input.KeyCode == Enum.KeyCode.T then
+        return
+    end
+
+    -- ✅ Only X triggers the lock system
     if input.KeyCode == Enum.KeyCode.X then
-        
         local char = Player.Character
         if not char then return end
 
@@ -236,7 +242,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 peakConnection:Disconnect()
 
                 StartCameraAimLoop()
-                wait(0.005)
+                task.wait(0.005)
                 mouse1click()
 
                 task.spawn(function()
@@ -247,3 +253,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end)
     end
 end)
+
